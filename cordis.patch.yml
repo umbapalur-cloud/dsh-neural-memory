@@ -1,0 +1,31 @@
+# dsh-neural-memory bundle patch (v1.1.0)
+#
+# - dim: 128 + embedMode: hybrid + migrateOnDimChange: true：容量翻 4 倍且重启自动无损迁移旧条目
+# - momentum: 0.25 + recallBoost: 0.15：Titans 惊讶动量 + 常用记忆回忆强化抗悬崖遗忘
+# - persistDebounceMs: 1500 + storageFormat: base64：合批防抖写盘 + 无损紧凑编码（体积减半、解析快 10x）
+# - autoObserve / autoRecall / autoForgetEveryTurns：真正接入会话生命周期，高置信按需微注入（<=600字，未命中 0 字隐身）
+- insert:
+    - id: dsh-neural-memory
+      name: dsh-neural-memory
+      config:
+        dim: 128
+        embedMode: hybrid
+        momentum: 0.25
+        recallBoost: 0.15
+        surpriseThreshold: 0.35
+        decay: 0.02
+        persistDebounceMs: 1500
+        storageFormat: base64
+        migrateOnDimChange: true
+        autoObserve: true
+        autoObserveThreshold: 0.55
+        autoObserveMaxSentences: 4
+        autoRecall: true
+        autoRecallMinScore: 0.52
+        autoRecallMinCoverage: 0.30
+        autoRecallMinMargin: 0.08
+        autoRecallTopK: 3
+        autoRecallCooldownTurns: 5
+        autoInjectMaxChars: 600
+        autoForgetEveryTurns: 12
+        autoForgetDecay: 0.015

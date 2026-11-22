@@ -1,0 +1,15 @@
+{
+  "meta": {
+    "title": "Neural Persistent Memory",
+    "description": "Titans-style neural persistent memory: filters long-term weight updates via prediction-error surprise and momentum, with natural weight decay, recall rehearsal, and optional auto-observe / auto-recall lifecycle integration. Provides 6 tools: nm_observe, nm_recall, nm_forget, nm_status, nm_export, nm_delete.",
+    "detail": "docs/DETAIL.md"
+  },
+  "tool": {
+    "nm_observe": "Feed text and update associative memory weights only when prediction surprise passes dual thresholds",
+    "nm_recall": "Read out via associative matrix M and verify candidates through dual score + lexical coverage gates",
+    "nm_forget": "Apply one round of weight decay to simulate a natural forgetting curve",
+    "nm_status": "Inspect entry count, dimension/mode, weight bytes, average surprise, and lifecycle status",
+    "nm_export": "Export the associative memory matrix and entries to an atomic JSON snapshot",
+    "nm_delete": "Explicitly erase entries with persistent tombstones and projection unlearning"
+  }
+}

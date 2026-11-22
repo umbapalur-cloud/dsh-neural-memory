@@ -1,0 +1,15 @@
+{
+  "meta": {
+    "title": "神经持久化记忆",
+    "description": "Titans 风格神经持久化记忆：用预测误差「惊讶度」与动量筛选长期权重，配权重衰减自然遗忘、回忆强化抗遗忘与会话自动观察/联想微注入。提供 nm_observe、nm_recall、nm_forget、nm_status、nm_export、nm_delete 六个工具。",
+    "detail": "docs/DETAIL.md"
+  },
+  "tool": {
+    "nm_observe": "喂一段文本，按绝对+相对惊讶度决定是否写入长期神经记忆",
+    "nm_recall": "经关联矩阵读出并过词面覆盖双闸门召回记忆条目",
+    "nm_forget": "施加一轮权重衰减，模拟自然遗忘曲线",
+    "nm_status": "查看记忆条目数、维度/模式、权重字节数、平均惊讶度与自动生命周期状态",
+    "nm_export": "把长期记忆权重与条目导出成 JSON 快照文件",
+    "nm_delete": "显式抹除指定条目（写入墓碑并从矩阵反学习消除残余）"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "dsh-neural-memory",
+  "version": "1.1.0",
+  "type": "module",
+  "description": "神经持久化记忆（Titans 风格）：用预测误差「惊讶度」与动量筛选长期权重，配权重衰减自然遗忘、回忆强化及自动观察/联想微注入，记忆内化在关联矩阵而非被动数据库。",
+  "license": "MIT",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "lib/**/*.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "docs",
+    "icon.svg",
+    "LICENSE",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,17 @@
+node_modules/
+dist/
+*.tgz
+*.zip
+*.bak
+*.bak-*
+*.orig
+*.rej
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+.env
+.env.*
+*.key
+*.pem
+*.local.json
