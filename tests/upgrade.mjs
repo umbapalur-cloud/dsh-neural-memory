@@ -9,7 +9,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { NeuralMemory, embedTextHybrid, frobenius } from '../lib/model.js'
 import { apply, Config } from '../lib/plugin.js'
-import { INJECT_SOURCE_KIND, INJECT_WATERMARK, extractCandidateSentences } from '../lib/lifecycle.js'
+import { INJECT_SOURCE_KIND, INJECT_WATERMARK, extractCandidateSentences, attachLifecycle } from '../lib/lifecycle.js'
 
 let passed = 0
 let failed = 0
@@ -272,11 +272,154 @@ async function main() {
       const cfgBad = Config['~standard'].validate({ embedMode: 'unknown', autoObserve: 'yes' })
       assert('Config 校验拦截非法新字段', Array.isArray(cfgBad.issues) && cfgBad.issues.length === 2)
 
+      // 生命周期轻量闸门统计可读
+      const statsBeforeDispose = memory.getAutoRecallStats?.()
+      assert(
+        'lifecycle 暴露轻量闸门统计（calls/injected/noMatch/cooldownOrVisible）',
+        statsBeforeDispose &&
+          statsBeforeDispose.calls === 4 &&
+          statsBeforeDispose.injected === 2 &&
+          statsBeforeDispose.cooldownOrVisible === 1 &&
+          statsBeforeDispose.noMatch === 1,
+        JSON.stringify(statsBeforeDispose),
+      )
+
       // 触发卸载清理
       for (const ef of effects) {
         const clean = ef()
         if (typeof clean === 'function') clean()
       }
+      assert('卸载后自动清理 getAutoRecallStats 挂载', memory.getAutoRecallStats === undefined)
+    }
+
+    console.log('\n=== 5. 闸门对齐（matchedScore/matchedMargin）与近阈值 debug 诊断 ===')
+    {
+      // 5a: model.recall() 返回 matchedScore / matchedMargin（未命中为 0，命中对齐 results[0]）
+      const dir = path.join(tmpRoot, 's5-matched')
+      const mem = new NeuralMemory({ path: dir, dim: 128, embedMode: 'hybrid', minEntriesForTrust: 1 })
+      await mem.observe('林霏喜欢在雨夜喝温热的桂花乌龙茶', { surpriseThreshold: 0 })
+      await mem.observe('海豚仓库的镜像地址配置在 harbor-cn.internal', { surpriseThreshold: 0 })
+      const rHit = await mem.recall('桂花乌龙茶', { minScore: 0.4, minCoverage: 0.3 })
+      assert(
+        'recall 命中时返回与 results[0] 对齐的 matchedScore 与 matchedMargin',
+        rHit.matched &&
+          Math.abs(rHit.matchedScore - rHit.results[0].score) < 1e-12 &&
+          rHit.matchedMargin > 0.3,
+        `matchedScore=${rHit.matchedScore.toFixed(3)} matchedMargin=${rHit.matchedMargin.toFixed(3)}`,
+      )
+      const rMiss = await mem.recall('完全无关的量子力学公式', { minScore: 0.52, minCoverage: 0.3 })
+      assert(
+        'recall 未命中时 matchedScore 与 matchedMargin 归零',
+        !rMiss.matched && rMiss.matchedScore === 0 && rMiss.matchedMargin === 0,
+      )
+
+      // 5b: 第三道闸门以 matchedScore / matchedMargin 为准，不被淘汰的假阳性 top1Score 误导
+      const ls = new Map()
+      const debugLogs = []
+      const stubCtx = {
+        on(ev, fn) {
+          if (!ls.has(ev)) ls.set(ev, [])
+          ls.get(ev).push(fn)
+          return () => ls.set(ev, (ls.get(ev) || []).filter((x) => x !== fn))
+        },
+      }
+      const queue = [
+        // 场景 1：原始 top1=0.85(被 coverage 淘汰的假阳性)、raw margin=0.25，但实际胜出 matchedScore=0.60, matchedMargin=0.02 < 0.08 → 应拦截！
+        {
+          ok: true,
+          matched: true,
+          entries: 8,
+          top1Score: 0.85,
+          top1Coverage: 0.0,
+          margin: 0.25,
+          matchedScore: 0.60,
+          matchedMargin: 0.02,
+          results: [{ hash: 'h-ambig', text: '实际胜出但与次优接近的记忆', score: 0.60, coverage: 0.70 }],
+        },
+        // 场景 2：实际胜出 matchedScore=0.78 >= 0.72 且 matchedMargin=0.02 < 0.08 → 应高分豁免并计入 marginBypassed！
+        {
+          ok: true,
+          matched: true,
+          entries: 8,
+          top1Score: 0.78,
+          top1Coverage: 0.85,
+          margin: 0.02,
+          matchedScore: 0.78,
+          matchedMargin: 0.02,
+          results: [{ hash: 'h-high', text: '极高分豁免边际闸门的关键记忆', score: 0.78, coverage: 0.85 }],
+        },
+        // 场景 3：近阈值未命中（top1=0.45 >= 0.52 - 0.12）→ 应记 noMatch 并输出 debug 诊断
+        {
+          ok: true,
+          matched: false,
+          entries: 8,
+          top1Score: 0.45,
+          top1Coverage: 0.40,
+          margin: 0.12,
+          matchedScore: 0,
+          matchedMargin: 0,
+          results: [],
+        },
+      ]
+      const stubMem = {
+        async recall() {
+          return queue.shift()
+        },
+        async flushAll() {},
+      }
+      const disposeStub = attachLifecycle(
+        stubCtx,
+        stubMem,
+        {
+          namespace: 'default',
+          autoObserve: false,
+          autoRecall: true,
+          autoRecallTopK: 2,
+          autoRecallMinScore: 0.52,
+          autoRecallMinCoverage: 0.30,
+          autoRecallMinMargin: 0.08,
+          autoRecallCooldownTurns: 6,
+          autoInjectMaxChars: 400,
+          autoForgetEveryTurns: 0,
+          autoForgetDecay: 0.02,
+        },
+        { debug: (m) => debugLogs.push(m), info() {}, warn() {} },
+      )
+      const firePreStep = async (q) => {
+        const msg = { id: `q-${Math.random()}`, role: 'user', content: [{ type: 'text', text: q }] }
+        let dec = { kind: 'proceed', messages: [msg] }
+        for (const fn of ls.get('agent/pre-step') || []) {
+          dec = await fn({ agent: { session: { id: 'sess-gate' } } }, async () => dec)
+        }
+        return dec
+      }
+
+      const dBlock = await firePreStep('测试场景一：假阳性 top1 不应绕过第三道闸门')
+      assert('实际胜出 matchedMargin 过低时正确拦截（不被假阳性 top1=0.85 误导）',
+        !dBlock.messages.some((m) => m?.source?.kind === INJECT_SOURCE_KIND))
+
+      const dBypass = await firePreStep('测试场景二：实际胜出高分豁免边际闸门')
+      assert('实际胜出 matchedScore ≥ 0.72 时高分豁免并注入',
+        dBypass.messages.some((m) => m?.source?.kind === INJECT_SOURCE_KIND))
+
+      const dNear = await firePreStep('测试场景三：近阈值未命中输出 debug 日志')
+      assert('近阈值未命中不注入', !dNear.messages.some((m) => m?.source?.kind === INJECT_SOURCE_KIND))
+
+      const gs = stubMem.getAutoRecallStats()
+      assert(
+        '闸门计数准确区分 marginBlocked / marginBypassed / noMatch / injected',
+        gs.calls === 3 && gs.marginBlocked === 1 && gs.marginBypassed === 1 && gs.noMatch === 1 && gs.injected === 1,
+        JSON.stringify(gs),
+      )
+      assert(
+        '落闸与近阈值均输出精简 debug 诊断（3 条）',
+        debugLogs.length === 3 &&
+          debugLogs.some((s) => s.includes('边际闸门拦截')) &&
+          debugLogs.some((s) => s.includes('高分豁免边际闸门')) &&
+          debugLogs.some((s) => s.includes('近阈值未命中')),
+        `debugLogs=${debugLogs.length}`,
+      )
+      disposeStub()
     }
 
     console.log(`\n========================================`)

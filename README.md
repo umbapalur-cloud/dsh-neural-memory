@@ -4,8 +4,9 @@
 > 信息该不该被记住，由**惊讶度**（模型自己的预测误差）与**动量**决定；**打分与排序**长在权重里，
 > 原文仍按条目表留存（见下方「实现口径」—— 它不是纯权重记忆）。
 >
-> **最新版：[v1.1.0 Release](https://github.com/umbapalur-cloud/dsh-neural-memory/releases/latest)**
-> v1.1.0 新增：全生命周期自动接入（`agent/inbox/claimed` 静默观察 + `agent/pre-step` 三闸门静默联想 + `idle` 防抖落盘与轻量衰减）、Titans 惊讶动量 `S`、回忆加固 `recallBoost`、删除正交投影抹除、中英混合词界嵌入 `hybrid`、`dim: 128` 无损迁移、Float32 Base64 紧凑落盘（基准验收 **12/12** + 升级专项 **21/21** 全绿）。
+> **最新版：[v1.1.1 Release](https://github.com/umbapalur-cloud/dsh-neural-memory/releases/latest)**
+> v1.1.1 修复与增强：修复自动联想第三道边际闸门被词面未过线的假阳性 `scored[0]` 误导的问题（新增对齐胜出候选 `results[0]` 的 `matchedScore` / `matchedMargin`），并补充零落盘轻量闸门计数（`nm_status` 可查 `autoRecallStats`）与近阈值 `debug` 诊断日志（基准验收 **12/12** + 升级专项 **30/30** 全绿）。
+> v1.1.0 新增：全生命周期自动接入（`agent/inbox/claimed` 静默观察 + `agent/pre-step` 三闸门静默联想 + `idle` 防抖落盘与轻量衰减）、Titans 惊讶动量 `S`、回忆加固 `recallBoost`、删除正交投影抹除、中英混合词界嵌入 `hybrid`、`dim: 128` 无损迁移、Float32 Base64 紧凑落盘。
 
 **这是原型，不是论文复现。** 它证明的是「神经权重可以做持久记忆，且能用指标量化」，
 不是「达到了 Titans 的效果」。所有数字见 [docs/DETAIL.md](docs/DETAIL.md) 的实测对照表，
@@ -273,7 +274,7 @@ nm_export   { }
 
 ```powershell
 node ./tests/run.mjs       # 12/12 严格数学与工程验收基准
-node ./tests/upgrade.mjs   # 21/21 v1.1.0 升级与全生命周期验收
+node ./tests/upgrade.mjs   # 30/30 v1.1.1 升级、闸门对齐与全生命周期验收
 # 退出码 0 = 全过；1 = 有失败（失败态会保留并打印真实数字）
 ```
 

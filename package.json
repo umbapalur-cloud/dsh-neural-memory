@@ -1,6 +1,6 @@
 {
   "name": "dsh-neural-memory",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "type": "module",
   "description": "神经持久化记忆（Titans 风格）：用预测误差「惊讶度」与动量筛选长期权重，配权重衰减自然遗忘、回忆强化及自动观察/联想微注入，记忆内化在关联矩阵而非被动数据库。",
   "license": "MIT",
